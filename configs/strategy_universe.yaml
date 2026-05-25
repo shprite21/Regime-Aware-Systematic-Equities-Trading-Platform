@@ -1,0 +1,22 @@
+large_cap_growth:
+  - AAPL
+  - MSFT
+  - NVDA
+  - AMZN
+  - GOOGL
+  - META
+
+defensive:
+  - UNH
+  - PG
+  - KO
+  - WMT
+  - JNJ
+
+cyclicals:
+  - JPM
+  - BAC
+  - XOM
+  - CAT
+  - HD
+

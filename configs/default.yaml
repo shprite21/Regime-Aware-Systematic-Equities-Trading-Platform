@@ -1,0 +1,135 @@
+experiment:
+  name: flagship_regime_aware_equities
+  start: "2015-01-01"
+  end: null
+  rebalance_frequency: "W-FRI"
+  initial_capital: 1000000
+
+data:
+  symbols:
+    - AAPL
+    - MSFT
+    - AMZN
+    - GOOGL
+    - META
+    - JPM
+    - XOM
+    - UNH
+    - NVDA
+    - HD
+  benchmark: SPY
+  sector_etfs:
+    - XLY
+    - XLP
+    - XLE
+    - XLF
+    - XLV
+    - XLI
+    - XLK
+    - XLB
+    - XLRE
+    - XLU
+  volatility_indices:
+    - "^VIX"
+  macro_indicators:
+    - DGS10
+    - CPIAUCSL
+    - UNRATE
+
+features:
+  return_windows: [1, 5, 21, 63, 126, 252]
+  volatility_windows: [21, 63]
+  momentum_windows: [63, 126, 252]
+  annualization_factor: 252
+
+regime_detection:
+  hmm:
+    n_states: 3
+    covariance_type: diag
+    random_state: 42
+  volatility:
+    lookback: 21
+    low_quantile: 0.33
+    high_quantile: 0.67
+  trend:
+    short_window: 50
+    long_window: 200
+  breadth:
+    moving_average_window: 200
+
+strategies:
+  cross_sectional_momentum:
+    lookback: 126
+    top_quantile: 0.2
+    bottom_quantile: 0.2
+    long_short: true
+  time_series_momentum:
+    lookback: 126
+    volatility_window: 21
+  moving_average_trend:
+    short_window: 50
+    long_window: 200
+  mean_reversion:
+    lookback: 20
+    z_entry: 1.5
+  short_term_reversal:
+    lookback: 5
+    z_entry: 1.0
+  bollinger_band:
+    lookback: 20
+    num_std: 2.0
+  rsi_reversal:
+    lookback: 14
+    lower: 30
+    upper: 70
+  volatility_breakout:
+    lookback: 55
+  atr_breakout:
+    atr_window: 14
+    atr_multiplier: 1.5
+  volatility_compression:
+    short_window: 10
+    breakout_window: 20
+    compression_quantile: 0.25
+  pead:
+    drift_days: 20
+  gap_continuation_reversal:
+    gap_z: 1.5
+    mode: continuation
+  earnings_momentum:
+    lookback: 63
+  sector_rotation:
+    lookback: 126
+    top_n: 3
+  pairs_trading:
+    lookback: 60
+    z_entry: 2.0
+    z_exit: 0.5
+  cointegration_pairs:
+    lookback: 90
+    max_pvalue: 0.1
+
+portfolio:
+  gross_leverage: 1.0
+  max_weight: 0.15
+  target_volatility: 0.10
+  regime_multipliers:
+    risk_on: 1.2
+    neutral: 1.0
+    risk_off: 0.5
+
+risk:
+  transaction_cost_bps: 2.0
+  slippage_bps: 1.0
+  max_asset_weight: 0.15
+  max_gross_exposure: 1.0
+  max_net_exposure: 0.25
+  volatility_target: 0.10
+  stop_loss: 0.08
+  trailing_stop: 0.12
+  drawdown_alert: 0.15
+
+execution:
+  slippage_bps: 1.0
+  commission_bps: 2.0
+  max_participation_rate: 0.10

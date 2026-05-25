@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Local datasets and generated research artifacts
+data/raw/
+data/cache/
+data/processed/
+outputs/
+reports/
+
+# Notebook/runtime noise
+.ipynb_checkpoints/
+*.log
