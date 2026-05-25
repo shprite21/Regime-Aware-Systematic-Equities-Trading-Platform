@@ -135,6 +135,42 @@ class QuantPlotter:
         axis.set_yticklabels(weights.columns)
         return axis.figure
 
+    def heatmap(self, matrix: pd.DataFrame, title: str = "Heatmap"):
+        """Plot a generic matrix heatmap."""
+
+        if self.config.interactive:
+            go = self._plotly()
+            figure = go.Figure(
+                data=go.Heatmap(
+                    z=matrix.values,
+                    x=matrix.columns,
+                    y=matrix.index,
+                    colorscale="RdBu",
+                    zmid=0 if matrix.min().min() < 0 else None,
+                )
+            )
+            figure.update_layout(title=f"{self.config.title_prefix}: {title}", template=self.config.template)
+            return figure
+        axis = self._matplotlib_axis(f"{self.config.title_prefix}: {title}")
+        axis.imshow(matrix.values, aspect="auto", cmap="RdBu")
+        axis.set_xticks(range(len(matrix.columns)))
+        axis.set_xticklabels(matrix.columns, rotation=45, ha="right")
+        axis.set_yticks(range(len(matrix.index)))
+        axis.set_yticklabels(matrix.index)
+        return axis.figure
+
+    def dendrogram(self, linkage_matrix, labels: list[str]):
+        """Plot hierarchical clustering dendrogram when scipy is installed."""
+
+        axis = self._matplotlib_axis(f"{self.config.title_prefix}: Strategy Clusters")
+        try:
+            from scipy.cluster.hierarchy import dendrogram
+
+            dendrogram(linkage_matrix, labels=labels, ax=axis)
+        except Exception:
+            axis.text(0.05, 0.5, "Dendrogram requires scipy linkage output.", transform=axis.transAxes)
+        return axis.figure
+
     def strategy_contribution(self, contributions: pd.DataFrame):
         """Plot cumulative strategy return contributions."""
 
@@ -216,6 +252,33 @@ class QuantPlotter:
         axis = self._matplotlib_axis(f"{self.config.title_prefix}: Volatility Regime Map")
         axis.scatter(aligned.index, aligned["realized_volatility"], c=aligned["regime"])
         return axis.figure
+
+    def walk_forward_equity(self, equity_curve: pd.Series, window_metrics: pd.DataFrame | None = None):
+        """Plot out-of-sample walk-forward equity and optional test segments."""
+
+        if self.config.interactive:
+            go = self._plotly()
+            figure = go.Figure()
+            figure.add_trace(go.Scatter(x=equity_curve.index, y=equity_curve, name="OOS Equity"))
+            if window_metrics is not None and not window_metrics.empty:
+                for _, row in window_metrics.iterrows():
+                    figure.add_vrect(
+                        x0=row["test_start"],
+                        x1=row["test_end"],
+                        fillcolor="#dbeafe",
+                        opacity=0.18,
+                        line_width=0,
+                    )
+            figure.update_layout(title=f"{self.config.title_prefix}: Walk-Forward Equity", template=self.config.template)
+            return figure
+        axis = self._matplotlib_axis(f"{self.config.title_prefix}: Walk-Forward Equity")
+        equity_curve.plot(ax=axis)
+        return axis.figure
+
+    def robustness_heatmap(self, heatmap: pd.DataFrame, metric: str = "Sharpe"):
+        """Plot parameter robustness heatmap."""
+
+        return self.heatmap(heatmap, title=f"Parameter Robustness: {metric}")
 
     @staticmethod
     def _plotly():

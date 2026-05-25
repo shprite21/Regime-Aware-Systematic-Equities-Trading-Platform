@@ -22,6 +22,10 @@ class PerformanceReport:
     turnover: pd.Series
     regime_breakdown: pd.DataFrame | None = None
     attribution: pd.DataFrame | None = None
+    benchmark_metrics: pd.DataFrame | None = None
+    factor_exposures: pd.DataFrame | None = None
+    regime_transition_matrix: pd.DataFrame | None = None
+    portfolio_diagnostics: dict[str, object] = field(default_factory=dict)
     metadata: dict[str, object] = field(default_factory=dict)
 
     @classmethod
@@ -53,4 +57,3 @@ class PerformanceReport:
         """Return metrics as a one-column DataFrame."""
 
         return pd.DataFrame.from_dict(self.metrics, orient="index", columns=["value"])
-

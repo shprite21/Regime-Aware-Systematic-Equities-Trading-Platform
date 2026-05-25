@@ -17,12 +17,27 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from analytics import (
+    AdvancedHTMLReportBuilder,
+    BenchmarkEngine,
+    CostSensitivityAnalyzer,
+    CostSensitivityConfig,
+    FactorExposureAnalyzer,
+    HTMLReportInputs,
+    PortfolioDiagnostics,
+    RegimeAnalytics,
+    StrategyCorrelationAnalyzer,
+    build_equity_style_factors,
+)
 from analytics.tearsheet import PerformanceReport
+from backtesting import WalkForwardConfig, WalkForwardValidator
 from backtesting.engine import BacktestConfig, PerformanceAttributor, VectorizedBacktester
 from data.features import FeatureEngineer
 from data.models import MarketDataBundle
+from data.validation import MarketDataQualityValidator
 from portfolio.allocation import AllocationConfig, RegimeConditionedAllocator
 from regime_detection import MarketBreadthRegimeDetector, RegimeEnsemble, VolatilityRegimeClassifier
+from research import ExperimentTracker, ParameterRobustnessTester, RobustnessConfig
 from risk.management import ExposureConstraint, RiskConfig, VolatilityTargeter
 from strategies import (
     ATRBreakoutStrategy,
@@ -39,6 +54,7 @@ from strategies import (
     VolatilityBreakoutStrategy,
     VolatilityCompressionStrategy,
 )
+from strategies.base import StrategyConfig
 from strategies.events import PEADStrategy
 from strategies.library import StrategyPipeline
 
@@ -276,10 +292,93 @@ def main() -> None:
     targeted = VolatilityTargeter(risk_config).scale_weights(constrained, returns)
 
     result = VectorizedBacktester(BacktestConfig(rebalance_frequency="W-FRI")).run(prices, targeted)
-    report = PerformanceReport.from_backtest(result, regimes.labels)
     contribution = PerformanceAttributor.strategy_contribution(prices, signals)
+    report = PerformanceReport.from_backtest(result, regimes.labels)
+
+    benchmark = BenchmarkEngine().compare(result.returns, prices)
+    correlation = StrategyCorrelationAnalyzer().analyze(contribution)
+    factors = build_equity_style_factors(prices, bundle.volume())
+    factor_result = FactorExposureAnalyzer().analyze(result.returns, factors, regimes.labels)
+    regime_analytics = RegimeAnalytics().analyze(regimes.labels, result.returns, contribution, result.weights)
+    diagnostics = PortfolioDiagnostics().analyze(result.weights, returns)
+    cost_sensitivity = CostSensitivityAnalyzer(
+        CostSensitivityConfig(slippage_bps=(0.0, 1.0, 3.0), commission_bps=(0.0, 2.0), spread_bps=(0.0, 2.0))
+    ).sweep(prices, targeted)
+    robustness = ParameterRobustnessTester(RobustnessConfig(metric="sharpe")).grid_search(
+        prices,
+        {"lookback": [63, 126], "top_quantile": [0.2, 0.3]},
+        lambda params: CrossSectionalMomentumStrategy(
+            StrategyConfig(
+                name="robustness_cross_sectional_momentum",
+                lookback=int(params["lookback"]),
+                params={"top_quantile": params["top_quantile"], "bottom_quantile": params["top_quantile"]},
+            )
+        ).generate(bundle),
+    )
+    walk_forward = WalkForwardValidator(
+        WalkForwardConfig(train_window=252, test_window=126, mode="rolling")
+    ).evaluate(
+        prices,
+        lambda frame, params: CrossSectionalMomentumStrategy(
+            StrategyConfig(
+                name="walk_forward_cross_sectional_momentum",
+                lookback=int(params.get("lookback", 126)) if params else 126,
+            )
+        ).generate(frame),
+        regimes=regimes.labels,
+        parameter_refitter=lambda train_prices: {"lookback": 126 if len(train_prices) > 300 else 63},
+    )
+    quality_report = MarketDataQualityValidator().validate(bundle.ohlcv)
+    data_quality_summary = pd.DataFrame(
+        {
+            "count": {
+                "missing_data_issues": len(quality_report.missing_data),
+                "stale_price_issues": len(quality_report.stale_prices),
+                "outlier_issues": len(quality_report.outliers),
+                "adjustment_warnings": len(quality_report.adjustment_warnings),
+                "duplicate_timestamps": int(quality_report.duplicate_timestamps.sum()),
+                "survivorship_warnings": len(quality_report.survivorship_warnings),
+            }
+        }
+    )
+
+    report.benchmark_metrics = benchmark.metrics
+    report.factor_exposures = factor_result.static_betas.to_frame("beta")
+    report.regime_transition_matrix = regime_analytics.transition_probabilities
+    report.portfolio_diagnostics = diagnostics
+
     report_path = REPORT_DIR / "research_report.html"
-    write_html_report(report, regimes.labels, contribution, report_path)
+    AdvancedHTMLReportBuilder().write(
+        report,
+        report_path,
+        HTMLReportInputs(
+            regimes=regimes.labels,
+            strategy_contribution=contribution,
+            benchmark_equity=benchmark.benchmark_equity,
+            benchmark_metrics=benchmark.metrics,
+            walk_forward_metrics=walk_forward.window_metrics,
+            correlation_matrix=correlation.static_correlation,
+            factor_betas=factor_result.static_betas,
+            regime_transition_matrix=regime_analytics.transition_probabilities,
+            robustness_results=robustness.results,
+            cost_sensitivity=cost_sensitivity,
+            portfolio_diagnostics={
+                "turnover": diagnostics["turnover"],
+                "exposure_concentration": diagnostics["exposure_concentration"],
+                "leverage_utilization": diagnostics["leverage_utilization"],
+                "expected_shortfall": diagnostics["expected_shortfall"],
+                "cvar_decomposition": diagnostics["cvar_decomposition"],
+            },
+            data_quality_summary=data_quality_summary,
+        ),
+    )
+    ExperimentTracker(PROJECT_ROOT / "outputs" / "experiments").start_run(
+        name="synthetic_regime_aware_research",
+        config={"source": "synthetic", "symbols": prices.columns.tolist()},
+        metrics=report.metrics,
+        parameters={"strategy_count": len(signals), "feature_panel_count": len(features)},
+        artifacts={"html_report": str(report_path)},
+    )
 
     print("Performance metrics")
     print(pd.Series(report.metrics).round(4).to_string())
@@ -287,6 +386,10 @@ def main() -> None:
     print(report.regime_breakdown.round(4).to_string())
     print("\nStrategy contribution tail")
     print(contribution.cumsum().tail().round(4).to_string())
+    print("\nBenchmark comparison")
+    print(benchmark.metrics.round(4).to_string())
+    print("\nWalk-forward summary")
+    print(pd.Series(walk_forward.summary()).round(4).to_string())
     print(f"\nFeature panels generated: {len(features)}")
     print(f"HTML report written to: {report_path}")
 

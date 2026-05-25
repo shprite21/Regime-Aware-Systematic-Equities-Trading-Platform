@@ -153,6 +153,9 @@ Supports:
 - multi-strategy evaluation
 - walk-forward testing
 - rolling retraining
+- expanding and rolling train/test windows
+- train/test regime separation diagnostics
+- out-of-sample stability metrics
 - realistic execution assumptions
 - transaction costs and slippage
 - performance attribution
@@ -161,6 +164,7 @@ Supports:
 
 Includes:
 
+- benchmark comparison against SPY proxy, equal-weight, buy-and-hold, momentum-only, and risk parity benchmarks
 - Sharpe ratio
 - Sortino ratio
 - Calmar ratio
@@ -170,6 +174,11 @@ Includes:
 - turnover analysis
 - exposure analysis
 - factor decomposition
+- factor exposure drift diagnostics
+- strategy correlation and clustering
+- parameter robustness testing
+- transaction cost sensitivity analysis
+- regime transition analytics
 - hit rate
 - skew and kurtosis
 - regime-wise performance breakdown
@@ -189,6 +198,7 @@ Generates professional quantitative research plots:
 - rolling correlations
 - factor exposure plots
 - volatility regime maps
+- advanced self-contained HTML research reports
 
 ## Tech Stack
 
@@ -255,6 +265,12 @@ Run the synthetic end-to-end research experiment:
 python scripts/run_research.py
 ```
 
+The script writes an institutional-style HTML report to:
+
+```text
+reports/research_report.html
+```
+
 Run tests:
 
 ```bash
@@ -304,6 +320,7 @@ Implemented:
 - feature engineering pipeline
 - HMM-style regime detection with fallback support
 - volatility, trend, breadth, macro risk, and ensemble regime detectors
+- professional data quality validation
 - cross-sectional momentum
 - time-series momentum
 - moving average trend following
@@ -332,12 +349,22 @@ Implemented:
 - vectorized backtesting
 - event-driven backtesting wrapper
 - walk-forward evaluation
+- institutional walk-forward validator with train/test windows
 - rolling retraining evaluator
+- benchmark comparison engine
+- strategy correlation and clustering analytics
+- factor exposure analytics
+- regime transition analytics
+- transaction cost sensitivity analysis
+- parameter robustness testing
+- experiment tracking
 - performance attribution
+- expanded attribution by strategy, asset, sector, factor, and regime
 - exposure analysis
 - factor decomposition
 - rolling correlation analytics
 - analytics tear sheet object
+- advanced HTML research report builder
 - visualization utilities
 - research pipeline orchestration
 - synthetic end-to-end research script

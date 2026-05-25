@@ -9,6 +9,12 @@ from backtesting.engine import (
     VectorizedBacktester,
     WalkForwardEvaluator,
 )
+from backtesting.walk_forward import (
+    WalkForwardConfig,
+    WalkForwardValidationResult,
+    WalkForwardValidator,
+    WalkForwardWindowResult,
+)
 
 __all__ = [
     "BacktestConfig",
@@ -17,5 +23,9 @@ __all__ = [
     "PerformanceAttributor",
     "RollingRetrainingEvaluator",
     "VectorizedBacktester",
+    "WalkForwardConfig",
     "WalkForwardEvaluator",
+    "WalkForwardValidationResult",
+    "WalkForwardValidator",
+    "WalkForwardWindowResult",
 ]
